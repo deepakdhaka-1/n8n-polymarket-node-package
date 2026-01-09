@@ -11,7 +11,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "types": ["node"],
     "forceConsistentCasingInFileNames": true
   },
   "include": [
@@ -20,7 +19,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.spec.ts"
+    "dist"
   ]
 }
