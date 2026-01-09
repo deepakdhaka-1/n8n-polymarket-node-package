@@ -1,29 +1,32 @@
-name: Claude AI Code Agent
+name: Claude Code Agent
 
 on:
-  push:
-    branches: [ "main", "master" ]
   pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   claude:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Claude Code Action Official
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
-            You are an expert senior software engineer.
+            You are a senior software engineer.
 
-            Review the entire repository.
-            1. Find bugs
-            2. Find security issues
-            3. Suggest performance improvements
-            4. Improve code quality and architecture
-            5. Output fixes as GitHub review comments.
+            Review this pull request.
+            - Find bugs
+            - Fix security issues
+            - Improve performance
+            - Refactor poor architecture
 
+            Apply fixes directly and comment on the PR.
