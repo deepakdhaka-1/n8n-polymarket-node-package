@@ -12,7 +12,7 @@ export class Polymarket implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Polymarket',
     name: 'polymarket',
-    icon: 'file:polymarket.svg',
+    icon: 'file:polymarket.png',
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
