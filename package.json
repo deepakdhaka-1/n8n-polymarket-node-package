@@ -10,14 +10,14 @@
     "trading"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/yourusername/n8n-nodes-polymarket",
+  "homepage": "https://github.com/deepakdhaka-1/n8n-polymarket-node-package/blob/main/tsconfig.json",
   "author": {
-    "name": "Your Name",
-    "email": "your.email@example.com"
+    "name": "Deepak Dhaka",
+    "email": "gxyz717@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/n8n-nodes-polymarket.git"
+    "url": "git+https://github.com/deepakdhaka-1/n8n-polymarket-node-package.git"
   },
   "main": "index.js",
   "scripts": {
