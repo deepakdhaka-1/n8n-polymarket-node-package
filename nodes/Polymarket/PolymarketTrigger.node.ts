@@ -12,7 +12,7 @@ export class PolymarketTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Polymarket Trigger',
     name: 'polymarketTrigger',
-    icon: 'file:polymarket.svg',
+    icon: 'file:polymarket.png',
     group: ['trigger'],
     version: 1,
     description: 'Triggers workflow based on Polymarket events',
