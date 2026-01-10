@@ -4,10 +4,11 @@ import {
 } from 'n8n-workflow';
 
 export class PolymarketApi implements ICredentialType {
-  name = 'polymarketApi';
-  displayName = 'Polymarket API';
-  documentationUrl = 'https://docs.polymarket.com/developers/CLOB/authentication';
-  properties: INodeProperties[] = [
+  public name = 'polymarketApi';
+  public displayName = 'Polymarket API';
+  public documentationUrl = 'https://docs.polymarket.com/developers/CLOB/authentication';
+
+  public properties: INodeProperties[] = [
     {
       displayName: 'API Key',
       name: 'apiKey',
@@ -61,5 +62,5 @@ export class PolymarketApi implements ICredentialType {
       default: 137,
       description: 'Blockchain network (use Polygon Mainnet for production)',
     },
-  ],
+  ];
 }
