@@ -5,8 +5,8 @@ import {
   INodeTypeDescription,
   NodeOperationError,
 } from 'n8n-workflow';
-import axios, { AxiosRequestConfig } from 'axios';
 import { ethers } from 'ethers';
+import * as crypto from 'crypto';
 
 export class Polymarket implements INodeType {
   description: INodeTypeDescription = {
@@ -16,7 +16,7 @@ export class Polymarket implements INodeType {
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-    description: 'Interact with Polymarket API for trading and market data',
+    description: 'Polymarket API - Markets, Events, Trading & Positions',
     defaults: {
       name: 'Polymarket',
     },
@@ -35,57 +35,29 @@ export class Polymarket implements INodeType {
         type: 'options',
         noDataExpression: true,
         options: [
-          {
-            name: 'Market',
-            value: 'market',
-          },
-          {
-            name: 'Order',
-            value: 'order',
-          },
-          {
-            name: 'Trade',
-            value: 'trade',
-          },
+          { name: 'Market', value: 'market', description: 'Market data and discovery' },
+          { name: 'Event', value: 'event', description: 'Event groups and categories' },
+          { name: 'Order', value: 'order', description: 'Trading operations' },
+          { name: 'Position', value: 'position', description: 'User positions and portfolio' },
+          { name: 'Trade', value: 'trade', description: 'Trade history' },
+          { name: 'Price', value: 'price', description: 'Real-time prices and orderbook' },
         ],
         default: 'market',
-        description: 'The resource to operate on',
       },
 
-      // ============================================
-      //               Market Operations
-      // ============================================
+      // ==================== MARKET OPERATIONS (Gamma API) ====================
       {
         displayName: 'Operation',
         name: 'operation',
         type: 'options',
         noDataExpression: true,
-        displayOptions: {
-          show: {
-            resource: ['market'],
-          },
-        },
+        displayOptions: { show: { resource: ['market'] } },
         options: [
-          {
-            name: 'Get All Markets',
-            value: 'getAll',
-            description: 'Retrieve all available markets',
-            action: 'Get all markets',
-          },
-          {
-            name: 'Get Market',
-            value: 'get',
-            description: 'Get details for a specific market',
-            action: 'Get a market',
-          },
-          {
-            name: 'Search Markets',
-            value: 'search',
-            description: 'Search for markets by keyword',
-            action: 'Search markets',
-          },
+          { name: 'Get Markets', value: 'getMarkets', action: 'Get markets', description: 'Fetch markets with filters' },
+          { name: 'Get Market by ID', value: 'getById', action: 'Get market by ID', description: 'Get specific market by condition ID' },
+          { name: 'Get Market by Slug', value: 'getBySlug', action: 'Get market by slug', description: 'Get specific market by slug' },
         ],
-        default: 'getAll',
+        default: 'getMarkets',
       },
       {
         displayName: 'Market ID',
@@ -93,114 +65,145 @@ export class Polymarket implements INodeType {
         type: 'string',
         default: '',
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['market'],
-            operation: ['get'],
-          },
-        },
-        description: 'The unique identifier of the market (conditionId)',
+        displayOptions: { show: { resource: ['market'], operation: ['getById'] } },
+        description: 'Market condition ID (0x...)',
+        placeholder: '0xe3b423dfad8c22ff75c9899c4e8176f628cf4ad4...',
       },
       {
-        displayName: 'Search Query',
-        name: 'searchQuery',
+        displayName: 'Slug',
+        name: 'slug',
         type: 'string',
         default: '',
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['market'],
-            operation: ['search'],
-          },
-        },
-        description: 'Search term to find markets',
+        displayOptions: { show: { resource: ['market'], operation: ['getBySlug'] } },
+        description: 'Market slug from URL',
+        placeholder: 'will-trump-win-2024',
       },
       {
-        displayName: 'Limit',
-        name: 'limit',
-        type: 'number',
-        default: 50,
-        displayOptions: {
-          show: {
-            resource: ['market'],
-            operation: ['getAll', 'search'],
-          },
-        },
-        description: 'Maximum number of results to return',
-        typeOptions: {
-          minValue: 1,
-          maxValue: 100,
-        },
-      },
-      {
-        displayName: 'Additional Fields',
-        name: 'additionalFields',
+        displayName: 'Filters',
+        name: 'marketFilters',
         type: 'collection',
-        placeholder: 'Add Field',
+        placeholder: 'Add Filter',
         default: {},
-        displayOptions: {
-          show: {
-            resource: ['market'],
-            operation: ['getAll'],
-          },
-        },
+        displayOptions: { show: { resource: ['market'], operation: ['getMarkets'] } },
         options: [
           {
-            displayName: 'Active Only',
-            name: 'active',
-            type: 'boolean',
-            default: true,
-            description: 'Whether to filter for active markets only',
-          },
-          {
-            displayName: 'Closed',
-            name: 'closed',
-            type: 'boolean',
-            default: false,
-            description: 'Whether to show closed markets',
+            displayName: 'Limit',
+            name: 'limit',
+            type: 'number',
+            default: 20,
+            description: 'Number of markets to return',
           },
           {
             displayName: 'Offset',
             name: 'offset',
             type: 'number',
             default: 0,
-            description: 'Number of results to skip (for pagination)',
+            description: 'Number of markets to skip',
+          },
+          {
+            displayName: 'Active Only',
+            name: 'active',
+            type: 'boolean',
+            default: true,
+            description: 'Whether to show only active markets',
+          },
+          {
+            displayName: 'Closed',
+            name: 'closed',
+            type: 'boolean',
+            default: false,
+            description: 'Whether to include closed markets',
+          },
+          {
+            displayName: 'Archived',
+            name: 'archived',
+            type: 'boolean',
+            default: false,
+            description: 'Whether to include archived markets',
+          },
+          {
+            displayName: 'Tag',
+            name: 'tag',
+            type: 'string',
+            default: '',
+            description: 'Filter by tag (e.g., politics, sports, crypto)',
+            placeholder: 'politics',
           },
         ],
       },
 
-      // ============================================
-      //               Order Operations
-      // ============================================
+      // ==================== EVENT OPERATIONS (Gamma API) ====================
       {
         displayName: 'Operation',
         name: 'operation',
         type: 'options',
         noDataExpression: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-          },
-        },
+        displayOptions: { show: { resource: ['event'] } },
+        options: [
+          { name: 'Get Events', value: 'getEvents', action: 'Get events', description: 'Get all events' },
+          { name: 'Get Event by Slug', value: 'getBySlug', action: 'Get event by slug', description: 'Get specific event' },
+        ],
+        default: 'getEvents',
+      },
+      {
+        displayName: 'Event Slug',
+        name: 'eventSlug',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: { show: { resource: ['event'], operation: ['getBySlug'] } },
+        description: 'Event slug',
+        placeholder: '2024-presidential-election',
+      },
+      {
+        displayName: 'Filters',
+        name: 'eventFilters',
+        type: 'collection',
+        placeholder: 'Add Filter',
+        default: {},
+        displayOptions: { show: { resource: ['event'], operation: ['getEvents'] } },
         options: [
           {
-            name: 'Create Order',
-            value: 'create',
-            description: 'Place a new buy or sell order',
-            action: 'Create an order',
+            displayName: 'Limit',
+            name: 'limit',
+            type: 'number',
+            default: 20,
           },
           {
-            name: 'Cancel Order',
-            value: 'cancel',
-            description: 'Cancel an existing order',
-            action: 'Cancel an order',
+            displayName: 'Offset',
+            name: 'offset',
+            type: 'number',
+            default: 0,
           },
           {
-            name: 'Get Orders',
-            value: 'getOrders',
-            description: 'Get your orders',
-            action: 'Get orders',
+            displayName: 'Active Only',
+            name: 'active',
+            type: 'boolean',
+            default: true,
           },
+          {
+            displayName: 'Closed',
+            name: 'closed',
+            type: 'boolean',
+            default: false,
+          },
+        ],
+      },
+
+      // ==================== ORDER OPERATIONS (CLOB API) ====================
+      {
+        displayName: 'Operation',
+        name: 'operation',
+        type: 'options',
+        noDataExpression: true,
+        displayOptions: { show: { resource: ['order'] } },
+        options: [
+          { name: 'Create Order', value: 'create', action: 'Create order' },
+          { name: 'Cancel Order', value: 'cancel', action: 'Cancel order' },
+          { name: 'Cancel All Orders', value: 'cancelAll', action: 'Cancel all orders' },
+          { name: 'Get Orders', value: 'getOrders', action: 'Get orders' },
+          { name: 'Get Order by ID', value: 'getById', action: 'Get order by ID' },
         ],
         default: 'create',
       },
@@ -210,39 +213,21 @@ export class Polymarket implements INodeType {
         type: 'string',
         default: '',
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-            operation: ['create'],
-          },
-        },
-        description: 'The outcome token ID to trade (from clobTokenIds array)',
+        displayOptions: { show: { resource: ['order'], operation: ['create'] } },
+        description: 'Outcome token ID from market clobTokenIds array',
+        placeholder: '53135072462907880191400140706440867753044989936304433583131786753949599718775',
       },
       {
         displayName: 'Side',
         name: 'side',
         type: 'options',
         options: [
-          {
-            name: 'Buy',
-            value: 'BUY',
-            description: 'Buy tokens',
-          },
-          {
-            name: 'Sell',
-            value: 'SELL',
-            description: 'Sell tokens',
-          },
+          { name: 'Buy', value: 'BUY', description: 'Buy tokens (bet Yes/long)' },
+          { name: 'Sell', value: 'SELL', description: 'Sell tokens (bet No/short)' },
         ],
         default: 'BUY',
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-            operation: ['create'],
-          },
-        },
-        description: 'Whether to buy or sell',
+        displayOptions: { show: { resource: ['order'], operation: ['create'] } },
       },
       {
         displayName: 'Price',
@@ -250,35 +235,19 @@ export class Polymarket implements INodeType {
         type: 'number',
         default: 0.5,
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-            operation: ['create'],
-          },
-        },
-        description: 'Price per share (between 0.01 and 0.99)',
-        typeOptions: {
-          minValue: 0.01,
-          maxValue: 0.99,
-          numberPrecision: 4,
-        },
+        displayOptions: { show: { resource: ['order'], operation: ['create'] } },
+        description: 'Price per share (0.01 to 0.99)',
+        typeOptions: { minValue: 0.01, maxValue: 0.99, numberPrecision: 4 },
       },
       {
-        displayName: 'Amount',
-        name: 'amount',
+        displayName: 'Size',
+        name: 'size',
         type: 'number',
         default: 10,
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-            operation: ['create'],
-          },
-        },
-        description: 'Amount in USDC to trade',
-        typeOptions: {
-          minValue: 1,
-        },
+        displayOptions: { show: { resource: ['order'], operation: ['create'] } },
+        description: 'Number of shares to trade',
+        typeOptions: { minValue: 0.01, numberPrecision: 2 },
       },
       {
         displayName: 'Order ID',
@@ -286,50 +255,110 @@ export class Polymarket implements INodeType {
         type: 'string',
         default: '',
         required: true,
-        displayOptions: {
-          show: {
-            resource: ['order'],
-            operation: ['cancel'],
-          },
-        },
-        description: 'The unique identifier of the order to cancel',
+        displayOptions: { show: { resource: ['order'], operation: ['cancel', 'getById'] } },
+        description: 'Order ID to cancel or retrieve',
+      },
+      {
+        displayName: 'Market',
+        name: 'market',
+        type: 'string',
+        default: '',
+        displayOptions: { show: { resource: ['order'], operation: ['cancelAll'] } },
+        description: 'Market condition ID (leave empty to cancel all orders across all markets)',
       },
 
-      // ============================================
-      //               Trade Operations
-      // ============================================
+      // ==================== POSITION OPERATIONS (Data API) ====================
       {
         displayName: 'Operation',
         name: 'operation',
         type: 'options',
         noDataExpression: true,
-        displayOptions: {
-          show: {
-            resource: ['trade'],
-          },
-        },
+        displayOptions: { show: { resource: ['position'] } },
         options: [
-          {
-            name: 'Get Trades',
-            value: 'getTrades',
-            description: 'Get trades for a market',
-            action: 'Get trades',
-          },
+          { name: 'Get All Positions', value: 'getAll', action: 'Get all positions' },
+          { name: 'Get Position by Market', value: 'getByMarket', action: 'Get position by market' },
+        ],
+        default: 'getAll',
+      },
+      {
+        displayName: 'Condition ID',
+        name: 'conditionId',
+        type: 'string',
+        default: '',
+        required: true,
+        displayOptions: { show: { resource: ['position'], operation: ['getByMarket'] } },
+        description: 'Market condition ID',
+      },
+
+      // ==================== TRADE OPERATIONS (CLOB API) ====================
+      {
+        displayName: 'Operation',
+        name: 'operation',
+        type: 'options',
+        noDataExpression: true,
+        displayOptions: { show: { resource: ['trade'] } },
+        options: [
+          { name: 'Get Trades', value: 'getTrades', action: 'Get trades' },
         ],
         default: 'getTrades',
+      },
+      {
+        displayName: 'Filters',
+        name: 'tradeFilters',
+        type: 'collection',
+        placeholder: 'Add Filter',
+        default: {},
+        displayOptions: { show: { resource: ['trade'] } },
+        options: [
+          {
+            displayName: 'Token ID',
+            name: 'tokenId',
+            type: 'string',
+            default: '',
+            description: 'Filter by token ID',
+          },
+          {
+            displayName: 'Limit',
+            name: 'limit',
+            type: 'number',
+            default: 100,
+          },
+        ],
+      },
+
+      // ==================== PRICE OPERATIONS (CLOB API) ====================
+      {
+        displayName: 'Operation',
+        name: 'operation',
+        type: 'options',
+        noDataExpression: true,
+        displayOptions: { show: { resource: ['price'] } },
+        options: [
+          { name: 'Get Price', value: 'getPrice', action: 'Get price' },
+          { name: 'Get Orderbook', value: 'getOrderbook', action: 'Get orderbook' },
+        ],
+        default: 'getPrice',
       },
       {
         displayName: 'Token ID',
         name: 'tokenId',
         type: 'string',
         default: '',
-        displayOptions: {
-          show: {
-            resource: ['trade'],
-            operation: ['getTrades'],
-          },
-        },
-        description: 'Token ID to get trades for',
+        required: true,
+        displayOptions: { show: { resource: ['price'] } },
+        description: 'Token ID to get price/orderbook for',
+      },
+      {
+        displayName: 'Side',
+        name: 'side',
+        type: 'options',
+        options: [
+          { name: 'Buy', value: 'BUY' },
+          { name: 'Sell', value: 'SELL' },
+        ],
+        default: 'BUY',
+        displayOptions: { show: { resource: ['price'], operation: ['getPrice'] } },
+        description: 'Which side to get price for',
       },
     ],
   };
@@ -338,194 +367,244 @@ export class Polymarket implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
     const credentials = await this.getCredentials('polymarketApi');
+
+    // Dynamic import axios
+    const axios = (await import('axios')).default;
     
-    // Polymarket API endpoints
-    const gammaUrl = 'https://gamma-api.polymarket.com';
-    const clobUrl = 'https://clob.polymarket.com';
+    // API Endpoints
+    const GAMMA_API = 'https://gamma-api.polymarket.com';
+    const CLOB_API = 'https://clob.polymarket.com';
+    const DATA_API = 'https://data-api.polymarket.com';
     
-    // Create wallet instance from private key
+    // Create wallet from private key
     const privateKey = credentials.privateKey as string;
     const wallet = new ethers.Wallet(
       privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`
     );
+    const address = wallet.address;
+    
+    // L1 Authentication Helper (for CLOB API)
+    const createL1Headers = (method: string, requestPath: string, body?: any): any => {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const bodyStr = body ? JSON.stringify(body) : '';
+      const message = timestamp + method + requestPath + bodyStr;
+      
+      const signature = crypto
+        .createHmac('sha256', Buffer.from(credentials.apiSecret as string, 'base64'))
+        .update(message)
+        .digest('base64');
+
+      return {
+        'POLY-ADDRESS': address,
+        'POLY-SIGNATURE': signature,
+        'POLY-TIMESTAMP': timestamp,
+        'POLY-API-KEY': credentials.apiKey as string,
+        'POLY-PASSPHRASE': credentials.apiPassphrase as string,
+        'Content-Type': 'application/json',
+      };
+    };
+
+    // L2 Authentication Helper (for Order Signing)
+    const signOrder = async (orderData: any): Promise<string> => {
+      const domain = {
+        name: 'Polymarket CTF Exchange',
+        version: '1',
+        chainId: credentials.chainId as number,
+        verifyingContract: '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
+      };
+
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'taker', type: 'address' },
+          { name: 'tokenId', type: 'uint256' },
+          { name: 'makerAmount', type: 'uint256' },
+          { name: 'takerAmount', type: 'uint256' },
+          { name: 'side', type: 'uint8' },
+          { name: 'expiration', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'feeRateBps', type: 'uint256' },
+          { name: 'signatureType', type: 'uint8' },
+        ],
+      };
+
+      return await wallet.signTypedData(domain, types, orderData);
+    };
     
     for (let i = 0; i < items.length; i++) {
       try {
         const resource = this.getNodeParameter('resource', i) as string;
         const operation = this.getNodeParameter('operation', i) as string;
-
         let responseData: any;
 
-        // ============================================
-        //               Market Operations
-        // ============================================
+        // ==================== MARKET OPERATIONS (Gamma API - No Auth) ====================
         if (resource === 'market') {
-          if (operation === 'getAll') {
-            const limit = this.getNodeParameter('limit', i) as number;
-            const additionalFields = this.getNodeParameter('additionalFields', i, {}) as any;
-            
+          if (operation === 'getMarkets') {
+            const filters = this.getNodeParameter('marketFilters', i, {}) as any;
             const params: any = {
-              limit: limit || 20,
-              offset: additionalFields.offset || 0,
+              limit: filters.limit || 20,
+              offset: filters.offset || 0,
             };
-            
-            if (additionalFields.active !== undefined) {
-              params.active = additionalFields.active;
-            }
-            if (additionalFields.closed !== undefined) {
-              params.closed = additionalFields.closed;
-            }
+            if (filters.active !== undefined) params.active = filters.active;
+            if (filters.closed !== undefined) params.closed = filters.closed;
+            if (filters.archived !== undefined) params.archived = filters.archived;
+            if (filters.tag) params.tag = filters.tag;
 
-            const response = await axios.get(`${gammaUrl}/markets`, { params });
+            const response = await axios.get(`${GAMMA_API}/markets`, { params });
             responseData = response.data;
             
-          } else if (operation === 'get') {
+          } else if (operation === 'getById') {
             const marketId = this.getNodeParameter('marketId', i) as string;
-            const response = await axios.get(`${gammaUrl}/markets/${marketId}`);
+            const response = await axios.get(`${GAMMA_API}/markets/${marketId}`);
             responseData = response.data;
             
-          } else if (operation === 'search') {
-            const searchQuery = this.getNodeParameter('searchQuery', i) as string;
-            const limit = this.getNodeParameter('limit', i) as number;
-            
-            const response = await axios.get(`${gammaUrl}/markets`, {
-              params: {
-                limit,
-                offset: 0,
-              },
-            });
-            
-            // Filter results by search query
-            const allMarkets = response.data;
-            responseData = allMarkets.filter((market: any) => 
-              market.question?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              market.description?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
+          } else if (operation === 'getBySlug') {
+            const slug = this.getNodeParameter('slug', i) as string;
+            const response = await axios.get(`${GAMMA_API}/markets/${slug}`);
+            responseData = response.data;
           }
         }
 
-        // ============================================
-        //               Order Operations  
-        // ============================================
+        // ==================== EVENT OPERATIONS (Gamma API - No Auth) ====================
+        else if (resource === 'event') {
+          if (operation === 'getEvents') {
+            const filters = this.getNodeParameter('eventFilters', i, {}) as any;
+            const params: any = {
+              limit: filters.limit || 20,
+              offset: filters.offset || 0,
+            };
+            if (filters.active !== undefined) params.active = filters.active;
+            if (filters.closed !== undefined) params.closed = filters.closed;
+
+            const response = await axios.get(`${GAMMA_API}/events`, { params });
+            responseData = response.data;
+            
+          } else if (operation === 'getBySlug') {
+            const eventSlug = this.getNodeParameter('eventSlug', i) as string;
+            const response = await axios.get(`${GAMMA_API}/events/${eventSlug}`);
+            responseData = response.data;
+          }
+        }
+
+        // ==================== ORDER OPERATIONS (CLOB API - L1 + L2 Auth) ====================
         else if (resource === 'order') {
-          const apiKey = credentials.apiKey as string;
-          const apiSecret = credentials.apiSecret as string;
-          const passphrase = credentials.apiPassphrase as string;
-          
           if (operation === 'create') {
             const tokenId = this.getNodeParameter('tokenId', i) as string;
             const side = this.getNodeParameter('side', i) as string;
             const price = this.getNodeParameter('price', i) as number;
-            const amount = this.getNodeParameter('amount', i) as number;
+            const size = this.getNodeParameter('size', i) as number;
 
-            // Calculate size based on amount and price
-            const size = amount / price;
-
-            // Create timestamp and nonce
-            const timestamp = Date.now();
-            const nonce = timestamp;
-
-            // Create order payload
+            // Prepare order
+            const nonce = Date.now();
+            const expiration = 0; // GTC
+            
             const orderPayload = {
-              tokenID: tokenId,
-              price: price.toFixed(4),
-              size: size.toFixed(2),
-              side: side,
-              feeRateBps: '0',
-              nonce: nonce,
-              maker: wallet.address,
-              expiration: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+              maker: address,
+              taker: '0x0000000000000000000000000000000000000000',
+              tokenId: tokenId,
+              makerAmount: (size * 1000000).toString(), // Convert to wei (6 decimals)
+              takerAmount: ((side === 'BUY' ? size * price : size * (1 - price)) * 1000000).toString(),
+              side: side === 'BUY' ? 0 : 1,
+              expiration,
+              nonce,
+              feeRateBps: 0,
+              signatureType: 1,
             };
 
-            // Sign with private key using EIP-712
-            const domain = {
-              name: 'Polymarket CTF Exchange',
-              version: '1',
-              chainId: parseInt(credentials.chainId as string) || 137,
-              verifyingContract: '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
-            };
+            // L2 Sign the order
+            const signature = await signOrder(orderPayload);
 
-            const types = {
-              Order: [
-                { name: 'maker', type: 'address' },
-                { name: 'taker', type: 'address' },
-                { name: 'tokenId', type: 'uint256' },
-                { name: 'makerAmount', type: 'uint256' },
-                { name: 'takerAmount', type: 'uint256' },
-                { name: 'side', type: 'uint8' },
-                { name: 'expiration', type: 'uint256' },
-                { name: 'nonce', type: 'uint256' },
-                { name: 'feeRateBps', type: 'uint256' },
-                { name: 'signatureType', type: 'uint8' },
-              ],
-            };
-
-            const signature = await wallet.signTypedData(domain, types, orderPayload);
+            // L1 Auth headers
+            const headers = createL1Headers('POST', '/order', { ...orderPayload, signature });
 
             // Submit order
             const response = await axios.post(
-              `${clobUrl}/order`,
-              {
-                ...orderPayload,
-                signature,
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'POLY-ADDRESS': wallet.address,
-                  'POLY-SIGNATURE': signature,
-                  'POLY-TIMESTAMP': timestamp.toString(),
-                  'POLY-NONCE': nonce.toString(),
-                  'POLY-API-KEY': apiKey,
-                  'POLY-PASSPHRASE': passphrase,
-                },
-              }
+              `${CLOB_API}/order`,
+              { ...orderPayload, signature },
+              { headers }
             );
             responseData = response.data;
             
           } else if (operation === 'cancel') {
             const orderId = this.getNodeParameter('orderId', i) as string;
-            const timestamp = Date.now();
+            const body = { orderID: orderId };
+            const headers = createL1Headers('DELETE', '/order', body);
             
-            const response = await axios.delete(`${clobUrl}/order`, {
-              data: { orderID: orderId },
-              headers: {
-                'POLY-ADDRESS': wallet.address,
-                'POLY-TIMESTAMP': timestamp.toString(),
-                'POLY-API-KEY': apiKey,
-                'POLY-PASSPHRASE': passphrase,
-              },
+            const response = await axios.delete(`${CLOB_API}/order`, {
+              headers,
+              data: body,
             });
             responseData = response.data || { success: true, orderId };
             
-          } else if (operation === 'getOrders') {
-            const timestamp = Date.now();
+          } else if (operation === 'cancelAll') {
+            const market = this.getNodeParameter('market', i, '') as string;
+            const body = market ? { market } : {};
+            const headers = createL1Headers('DELETE', '/orders', body);
             
-            const response = await axios.get(`${clobUrl}/orders`, {
-              headers: {
-                'POLY-ADDRESS': wallet.address,
-                'POLY-TIMESTAMP': timestamp.toString(),
-                'POLY-API-KEY': apiKey,
-                'POLY-PASSPHRASE': passphrase,
-              },
+            const response = await axios.delete(`${CLOB_API}/orders`, {
+              headers,
+              data: body,
+            });
+            responseData = response.data;
+            
+          } else if (operation === 'getOrders') {
+            const headers = createL1Headers('GET', '/orders');
+            const response = await axios.get(`${CLOB_API}/orders`, { headers });
+            responseData = response.data;
+            
+          } else if (operation === 'getById') {
+            const orderId = this.getNodeParameter('orderId', i) as string;
+            const headers = createL1Headers('GET', `/order/${orderId}`);
+            const response = await axios.get(`${CLOB_API}/order/${orderId}`, { headers });
+            responseData = response.data;
+          }
+        }
+
+        // ==================== POSITION OPERATIONS (Data API - No Auth) ====================
+        else if (resource === 'position') {
+          if (operation === 'getAll') {
+            const response = await axios.get(`${DATA_API}/positions`, {
+              params: { user: address },
+            });
+            responseData = response.data;
+            
+          } else if (operation === 'getByMarket') {
+            const conditionId = this.getNodeParameter('conditionId', i) as string;
+            const response = await axios.get(`${DATA_API}/positions`, {
+              params: { user: address, condition_id: conditionId },
             });
             responseData = response.data;
           }
         }
 
-        // ============================================
-        //               Trade Operations
-        // ============================================
+        // ==================== TRADE OPERATIONS (CLOB API - Partial Auth) ====================
         else if (resource === 'trade') {
-          if (operation === 'getTrades') {
-            const tokenId = this.getNodeParameter('tokenId', i, '') as string;
+          const filters = this.getNodeParameter('tradeFilters', i, {}) as any;
+          const params: any = {
+            maker: address,
+            limit: filters.limit || 100,
+          };
+          if (filters.tokenId) params.token_id = filters.tokenId;
+          
+          const response = await axios.get(`${CLOB_API}/trades`, { params });
+          responseData = response.data;
+        }
+
+        // ==================== PRICE OPERATIONS (CLOB API - No Auth) ====================
+        else if (resource === 'price') {
+          const tokenId = this.getNodeParameter('tokenId', i) as string;
+          
+          if (operation === 'getPrice') {
+            const side = this.getNodeParameter('side', i) as string;
+            const response = await axios.get(`${CLOB_API}/price`, {
+              params: { token_id: tokenId, side },
+            });
+            responseData = response.data;
             
-            const params: any = {};
-            if (tokenId) {
-              params.token_id = tokenId;
-            }
-            
-            const response = await axios.get(`${clobUrl}/trades`, { params });
+          } else if (operation === 'getOrderbook') {
+            const response = await axios.get(`${CLOB_API}/book`, {
+              params: { token_id: tokenId },
+            });
             responseData = response.data;
           }
         }
@@ -538,28 +617,21 @@ export class Polymarket implements INodeType {
 
       } catch (error: any) {
         if (this.continueOnFail()) {
-          const errorData = {
+          returnData.push({
             json: {
               error: error.message,
-              errorDetails: error.response?.data || {},
-              statusCode: error.response?.status,
-              endpoint: error.config?.url,
-              method: error.config?.method,
+              details: error.response?.data || {},
+              status: error.response?.status,
+              url: error.config?.url,
             },
             pairedItem: { item: i },
-          };
-          returnData.push(errorData);
+          });
           continue;
         }
-        
-        const errorMessage = error.response?.data?.message || error.message;
         throw new NodeOperationError(
           this.getNode(),
-          `Polymarket API Error: ${errorMessage}`,
-          { 
-            itemIndex: i,
-            description: `Endpoint: ${error.config?.url}`,
-          }
+          `Polymarket Error: ${error.response?.data?.message || error.message}`,
+          { itemIndex: i, description: `URL: ${error.config?.url}` }
         );
       }
     }
