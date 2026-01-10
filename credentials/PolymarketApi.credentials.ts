@@ -1,5 +1,4 @@
 import {
-  IAuthenticateGeneric,
   ICredentialType,
   INodeProperties,
 } from 'n8n-workflow';
@@ -7,7 +6,7 @@ import {
 export class PolymarketApi implements ICredentialType {
   name = 'polymarketApi';
   displayName = 'Polymarket API';
-  documentationUrl = 'https://docs.polymarket.com';
+  documentationUrl = 'https://docs.polymarket.com/developers/CLOB/authentication';
   properties: INodeProperties[] = [
     {
       displayName: 'API Key',
@@ -16,7 +15,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket API key from Builder API section',
+      description: 'Your Polymarket Builder API Key (from Settings → Builder API)',
     },
     {
       displayName: 'API Secret',
@@ -25,7 +24,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket API secret from Builder API section',
+      description: 'Your Polymarket Builder API Secret',
     },
     {
       displayName: 'API Passphrase',
@@ -34,7 +33,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket API passphrase from Builder API section',
+      description: 'Your Polymarket Builder API Passphrase',
     },
     {
       displayName: 'Private Key',
@@ -43,7 +42,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your wallet private key from Magic Link export (without 0x prefix)',
+      description: 'Your wallet private key (exported from Magic Link, without 0x prefix)',
     },
     {
       displayName: 'Chain ID',
@@ -52,15 +51,15 @@ export class PolymarketApi implements ICredentialType {
       options: [
         {
           name: 'Polygon Mainnet',
-          value: '137',
+          value: 137,
         },
         {
-          name: 'Mumbai Testnet',
-          value: '80001',
+          name: 'Amoy Testnet',
+          value: 80002,
         },
       ],
-      default: '137',
-      description: 'The blockchain network to use for transactions',
+      default: 137,
+      description: 'Blockchain network (use Polygon Mainnet for production)',
     },
-  ];
+  ],
 }
