@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-polymarket",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "description": "n8n community nodes for Polymarket - trading, market data, and order management",
   "keywords": [
     "n8n-community-node-package",
