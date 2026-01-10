@@ -16,7 +16,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket API key',
+      description: 'Your Polymarket API key from Builder API section',
     },
     {
       displayName: 'API Secret',
@@ -25,7 +25,16 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket API secret',
+      description: 'Your Polymarket API secret from Builder API section',
+    },
+    {
+      displayName: 'API Passphrase',
+      name: 'apiPassphrase',
+      type: 'string',
+      typeOptions: { password: true },
+      default: '',
+      required: true,
+      description: 'Your Polymarket API passphrase from Builder API section',
     },
     {
       displayName: 'Private Key',
@@ -34,7 +43,7 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Ethereum wallet private key (without 0x prefix) for signing transactions',
+      description: 'Your wallet private key from Magic Link export (without 0x prefix)',
     },
     {
       displayName: 'Chain ID',
@@ -43,25 +52,15 @@ export class PolymarketApi implements ICredentialType {
       options: [
         {
           name: 'Polygon Mainnet',
-          value: 137,
+          value: '137',
         },
         {
           name: 'Mumbai Testnet',
-          value: 80001,
+          value: '80001',
         },
       ],
-      default: 137,
+      default: '137',
       description: 'The blockchain network to use for transactions',
     },
   ];
-
-  authenticate: IAuthenticateGeneric = {
-    type: 'generic',
-    properties: {
-      headers: {
-        'Authorization': '=Bearer {{$credentials.apiKey}}',
-        'X-Api-Secret': '={{$credentials.apiSecret}}',
-      },
-    },
-  };
 }
