@@ -70,5 +70,5 @@ export class PolymarketApi implements ICredentialType {
       default: 137,
       description: 'Blockchain network (use Polygon Mainnet for production)',
     },
-  ],
+  ];
 }
