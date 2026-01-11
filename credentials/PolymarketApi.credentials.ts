@@ -4,23 +4,22 @@ import {
 } from 'n8n-workflow';
 
 export class PolymarketApi implements ICredentialType {
-  public name = 'polymarketApi';
-  public displayName = 'Polymarket API';
-  public documentationUrl = 'https://docs.polymarket.com/developers/CLOB/authentication';
-
-  public properties: INodeProperties[] = [
+  name = 'polymarketApi';
+  displayName = 'Polymarket API';
+  documentationUrl = 'https://docs.polymarket.com/developers/builders/builder-api';
+  properties: INodeProperties[] = [
     {
-      displayName: 'API Key',
-      name: 'apiKey',
+      displayName: 'Builder API Key',
+      name: 'builderApiKey',
       type: 'string',
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your Polymarket Builder API Key (from Settings → Builder API)',
+      description: 'Your Polymarket Builder API Key from Builder Profile',
     },
     {
-      displayName: 'API Secret',
-      name: 'apiSecret',
+      displayName: 'Builder API Secret',
+      name: 'builderApiSecret',
       type: 'string',
       typeOptions: { password: true },
       default: '',
@@ -28,8 +27,8 @@ export class PolymarketApi implements ICredentialType {
       description: 'Your Polymarket Builder API Secret',
     },
     {
-      displayName: 'API Passphrase',
-      name: 'apiPassphrase',
+      displayName: 'Builder API Passphrase',
+      name: 'builderApiPassphrase',
       type: 'string',
       typeOptions: { password: true },
       default: '',
@@ -43,7 +42,16 @@ export class PolymarketApi implements ICredentialType {
       typeOptions: { password: true },
       default: '',
       required: true,
-      description: 'Your wallet private key (exported from Magic Link, without 0x prefix)',
+      description: 'Your Ethereum wallet private key (without 0x prefix) - used for signing orders',
+    },
+    {
+      displayName: 'Proxy Wallet Address',
+      name: 'proxyWalletAddress',
+      type: 'string',
+      default: '',
+      required: true,
+      description: 'Your Polymarket Proxy Wallet address (Safe wallet deployed via Relayer)',
+      placeholder: '0x...',
     },
     {
       displayName: 'Chain ID',
@@ -62,5 +70,5 @@ export class PolymarketApi implements ICredentialType {
       default: 137,
       description: 'Blockchain network (use Polygon Mainnet for production)',
     },
-  ];
+  ],
 }
